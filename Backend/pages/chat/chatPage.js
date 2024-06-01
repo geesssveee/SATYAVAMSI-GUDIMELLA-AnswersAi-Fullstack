@@ -49,19 +49,35 @@ const authenticateToken = (req, res, next) => {
 const enforceTokenLimit = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
+    const currentDate = new Date();
+    const lastResetDate = new Date(user.lastResetDate);
 
+    console.log('Current Date:', currentDate);
+    console.log('Last Reset Date:', lastResetDate);
 
-    const currentDate = new Date().setHours(0, 0, 0, 0); 
-    if (user.lastResetDate.getTime() !== currentDate) {
+    // Check if the current date is different from the last reset date
+    if (currentDate.toDateString() !== lastResetDate.toDateString()) {
+      // Reset tokenUsage to 0 and set lastResetDate to the beginning of the current day
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      console.log('Resetting tokenUsage and lastResetDate');
+      console.log('Previous tokenUsage:', user.tokenUsage);
+      console.log('Previous lastResetDate:', user.lastResetDate);
       user.tokenUsage = 0;
-      user.lastResetDate = currentDate;
+      user.lastResetDate = today;
+      console.log('New tokenUsage:', user.tokenUsage);
+      console.log('New lastResetDate:', user.lastResetDate);
       await user.save();
+      console.log('User document updated');
     }
+
+    console.log('Current tokenUsage:', user.tokenUsage);
+    console.log('Daily Token Limit:', user.dailyTokenLimit);
 
     if (user.tokenUsage >= user.dailyTokenLimit) {
+      console.log('Daily token limit exceeded');
       return res.status(403).send({ error: 'Daily token limit exceeded' });
     }
-
     next();
   } catch (error) {
     console.error('Error enforcing token limit:', error.message);
@@ -81,7 +97,7 @@ async function query(data) {
   }
 }
 
-router.post('/',authenticateToken, chatLimiter,enforceTokenLimit, async (req, res) => {
+router.post('/',authenticateToken, enforceTokenLimit,chatLimiter, async (req, res) => {
   const userPrompt = req.body.prompt;
   const userId = req.user._id;
 
